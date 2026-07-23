@@ -17,7 +17,6 @@ API REST pour la gestion de comptes bancaires et de leurs lignes de compte (tran
 - [Format des erreurs](#format-des-erreurs)
 - [Sécurité](#sécurité)
 - [CORS](#cors)
-- [Collection Postman](#collection-postman)
 
 ## Fonctionnalités
 
@@ -75,7 +74,7 @@ cp .env.example .env
 | `CORS_ORIGIN` | Non (défaut : toute origine) | Origines autorisées, séparées par des virgules | `https://mon-front.com,http://localhost:5173` |
 | `MONGO_SSL` | Non | `true`/`false` pour forcer l'option SSL/TLS de connexion | `true` |
 
-Le serveur refuse de démarrer si `MONGO_URI` ou `JWT_SECRET` est manquant.
+### Le serveur refuse de démarrer si `MONGO_URI` ou `JWT_SECRET` est manquant.
 
 ## Démarrage
 
@@ -176,7 +175,7 @@ Crée un nouvel utilisateur.
 
 ```json
 {
-  "email": "jimmy@example.com",
+  "email": "Tom@example.com",
   "password": "MotDePasse1!"
 }
 ```
@@ -188,7 +187,7 @@ Crée un nouvel utilisateur.
   "status": "success",
   "data": {
     "user": {
-      "email": "jimmy@example.com",
+      "email": "Tom@example.com",
       "_id": "665f1a2b3c4d5e6f7a8b9c0d",
       "createdAt": "2026-07-23T05:21:34.428Z",
       "updatedAt": "2026-07-23T05:21:34.428Z"
@@ -209,7 +208,7 @@ Authentifie un utilisateur et renvoie un token JWT.
 
 ```json
 {
-  "email": "jimmy@example.com",
+  "email": "Tom@example.com",
   "password": "MotDePasse1!"
 }
 ```
@@ -526,23 +525,12 @@ Toute erreur renvoie un JSON de la forme suivante, avec le code HTTP corresponda
 ## Sécurité
 
 - **Mass-assignment** : aucun contrôleur n'assigne `req.body` tel quel à un document. Les champs sensibles (`user_id`, `account_id`, `_id`) sont toujours dérivés du token JWT ou de ressources déjà vérifiées, jamais du corps de la requête.
-- **Injection NoSQL** : `express-mongo-sanitize` (middleware global) retire toute clé commençant par `$` ou contenant `.` dans `req.body`/`req.query`/`req.params`, en complément de la validation de type déjà appliquée sur les champs texte (`isNonEmptyString`).
+- **Injection NoSQL** : `express-mongo-sanitize` (middleware global) retire toute clé commençant par `$` ou contenant `.` dans `req.body`/`req.query`/`req.params`, en complément de la validation de type déjà appliquée sur les champs texte (`isNonEmptyString`).!!
 - **Force brute** : `/api/auth/register` et `/api/auth/login` sont limités à 20 requêtes / 5 minutes par IP (`express-rate-limit`), au-delà : `429`.
-- **Mots de passe** : hachés avec `bcryptjs` (jamais stockés ni renvoyés en clair), comparaison à temps constant même quand l'email n'existe pas (évite l'énumération de comptes par mesure de temps de réponse).
+- **Mots de passe** : hachés avec `bcryptjs` (jamais stockés ni renvoyés en clair).
 - **JWT** : algorithme épinglé (`HS256`) à la vérification, pas de confiance dans l'algorithme annoncé par le token.
-- **Suppression de compte** : transaction MongoDB (atomique) avec repli automatique si la base ne supporte pas les transactions (voir [`DELETE /api/accounts/:accountId`](#delete-apiaccountsaccountid)).
-- **Privilège minimal (recommandation de déploiement, non applicable depuis le code)** : l'utilisateur MongoDB utilisé dans `MONGO_URI` doit être un compte dédié à l'application avec uniquement les droits `readWrite` sur sa propre base, jamais un accès administrateur global.
-- **CSRF** : non applicable ici — l'authentification se fait par token `Authorization: Bearer`, jamais par cookie, donc aucune requête n'est automatiquement authentifiée par le navigateur.
+- **Suppression de compte** : transaction MongoDB (atomique) avec repli automatique si la base ne supporte pas les transactions.
 
 ## CORS
 
 Les requêtes cross-origin sont autorisées via le middleware `cors`, configurable avec `CORS_ORIGIN` (voir [Configuration](#configuration)). Sans configuration, toute origine est acceptée.
-
-## Collection Postman
-
-Le fichier [`Bank_Accounts_API.postman_collection.json`](Bank_Accounts_API.postman_collection.json) contient les 13 routes de l'API, prêtes à l'emploi (Postman desktop, Postman web, ou extension Postman pour VS Code : Import → sélectionner le fichier).
-
-- Variables de collection : `baseUrl` (par défaut `http://localhost:3000/api`), `token`, `accountId`, `transactionId`.
-- L'authentification `Authorization: Bearer {{token}}` est appliquée automatiquement à toutes les requêtes protégées.
-- La requête *Connexion* capture le token dans `{{token}}`, *Créer un compte* capture l'id dans `{{accountId}}`, *Ajouter une transaction* capture l'id dans `{{transactionId}}` — les requêtes suivantes les réutilisent sans manipulation manuelle.
-- Ordre des dossiers pensé pour une exécution séquentielle (Collection Runner ou clic par clic) : Auth → Comptes → Transactions → Nettoyage (suppression du compte en dernier, car elle supprime aussi ses transactions).
